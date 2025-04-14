@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "traderfit-bridge"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
-  { name="Kisra Fistya", email="kisra.fistya@gmail.com" }, # Or your info
+  { name="Kisra Fistya", email="kisra.fistya@gmail.com" },
 ]
 description = "A stdio bridge for the TraderFit MCP API"
 readme = "README.md"
@@ -24,8 +24,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/yourusername/traderfit-bridge" # Placeholder
-"Bug Tracker" = "https://github.com/yourusername/traderfit-bridge/issues" # Placeholder
+"Homepage" = "https://github.com/rizkisyaf/traderfit-bridge"
+"Bug Tracker" = "https://github.com/rizkisyaf/traderfit-bridge/issues"
 
 [project.scripts]
 traderfit-bridge = "traderfit_bridge.main:run_bridge"

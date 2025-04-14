@@ -1,0 +1,2 @@
+[console_scripts]
+traderfit-bridge = traderfit_bridge.main:run_bridge

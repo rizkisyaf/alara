@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "traderfit-bridge"
+version = "0.1.0"
+authors = [
+  { name="Kisra Fistya", email="kisra.fistya@gmail.com" }, # Or your info
+]
+description = "A stdio bridge for the TraderFit MCP API"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License", # Choose your license
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mcp>=1.6.0",
+    "httpx>=0.25.0",
+    "python-dotenv>=1.0.0",
+    "openapi-pydantic>=0.5.0"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/traderfit-bridge" # Placeholder
+"Bug Tracker" = "https://github.com/yourusername/traderfit-bridge/issues" # Placeholder
+
+[project.scripts]
+traderfit-bridge = "traderfit_bridge.main:run_bridge"
+
+[tool.setuptools.packages.find]
+where = ["src"]  # look for packages in the src directory
+
+# Optional: Add linters/formatters like black, ruff if desired
+# [tool.ruff]
+# line-length = 88
+# select = ["E", "W", "F", "I", "UP"]
+# ignore = []
+
+# [tool.black]
+# line-length = 88
+
+# Optional: Configure linters/formatters if desired
+# [tool.black]
+# line-length = 88
+# [tool.isort]
+# profile = "black" 

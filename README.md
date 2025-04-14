@@ -11,91 +11,47 @@ This package provides a Machine Cognition Protocol (MCP) bridge using standard i
 ## Installation
 
 ```bash
-# Coming soon to PyPI!
-# pip install traderfit-bridge 
+# Install from PyPI
+pip install traderfit-bridge
 ```
 
-*(Currently, installation requires cloning the repository and setting up the environment manually - see Development Setup below)*
+## Configuration
 
-## Configuration (Command-Based - Current Method)
-
-To use this bridge with Cursor, you need to configure it in your `~/.cursor/mcp.json` file within the `"mcpServers"` section. 
-
-**Important:** You must replace the placeholder paths with the absolute paths on your local machine.
-
-1.  Generate an API key from the TraderFitAI platform dashboard.
-2.  Clone this repository: `git clone https://github.com/rizkisyaf/traderfit-bridge.git`
-3.  Navigate into the directory: `cd traderfit-bridge`
-4.  Create and activate a Python virtual environment:
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate 
-    ```
-5.  Install dependencies: `pip install -e .` (Installs in editable mode)
-6.  Find the absolute path to the installed `traderfit-bridge` executable (usually within `venv/bin/`) and the project's root directory (`pwd`).
-7.  Add the following configuration to your `~/.cursor/mcp.json`, replacing placeholders:
-
-```json
-{
-    "mcpServers": {
-        "traderfit": {
-            "name": "TraderFit",
-            "description": "TraderFitAI Bridge (StdIO)",
-            "protocol": "stdio",
-            "command": "/absolute/path/to/your/traderfit-bridge/venv/bin/traderfit-bridge",
-            "cwd": "/absolute/path/to/your/traderfit-bridge", 
-            "env": {
-                "TRADERFIT_API_KEY": "YOUR_TRADERFIT_API_KEY_HERE",
-                "TRADERFIT_MCP_URL": "https://traderfit-mcp.skolp.com" 
-            }
-        }
-        // ... other servers ...
-    }
-}
-```
-
-8. Reload MCP Clients in Cursor.
-
-## Configuration (Package-Based - Future)
-
-*(This method requires installing the package from PyPI: `pip install traderfit-bridge`)*
-
-Once the package is installed, the bridge can be configured using a simple package reference in `~/.cursor/mcp.json`, **provided** you create a configuration file to store your API key.
+This bridge uses the command-based configuration method for MCP clients like Cursor. The package includes a helper script to generate the necessary JSON snippet for you.
 
 1.  **Install the package:**
     ```bash
     pip install traderfit-bridge
     ```
-2.  **Create the configuration directory (if it doesn't exist):**
+2.  **Generate your API Key:** Obtain your API key from the TraderFitAI platform dashboard.
+3.  **Generate MCP Configuration:** Run the following command in your terminal, replacing `YOUR_TRADERFIT_API_KEY_HERE` with the key you obtained:
     ```bash
-    mkdir -p ~/.config/traderfit
+    python -m traderfit_bridge.main --api-key YOUR_TRADERFIT_API_KEY_HERE --print-mcp-config
     ```
-3.  **Create and edit the configuration file:** `~/.config/traderfit/config.ini`
-4.  **Add your credentials to the file:**
-    ```ini
-    [Credentials]
-    api_key = YOUR_TRADERFIT_API_KEY_HERE
-    # Optional: Override the default backend URL
-    # backend_url = https://your-custom-backend.com
-    ```
-    Replace `YOUR_TRADERFIT_API_KEY_HERE` with the key generated from the TraderFitAI platform.
+    *(Note: If `python` doesn't work, try `python3`)*
 
-5.  **Configure Cursor (`~/.cursor/mcp.json`):**
+4.  **Copy the Output:** The command will print a JSON object similar to the example below. Copy this entire object.
     ```json
     {
         "mcpServers": {
             "traderfit": {
                 "name": "TraderFit",
-                "description": "TraderFitAI Bridge",
-                "package": "traderfit-bridge", 
-                "version": "0.1.1" // Or the specific version you installed
-                // No command, cwd, or env needed here if config file is used
+                "description": "TraderFitAI Bridge (via helper script)",
+                "protocol": "stdio",
+                "command": "/path/to/installed/traderfit-bridge", // Automatically detected path
+                "cwd": "/path/to/parent/of/command", // Automatically detected path
+                "env": {
+                    "TRADERFIT_API_KEY": "YOUR_TRADERFIT_API_KEY_HERE", // Your key inserted here
+                    "TRADERFIT_MCP_URL": "https://traderfit-mcp.skolp.com"
+                }
             }
-            // ... other servers ...
         }
     }
     ```
-6.  **Reload MCP Clients in Cursor.**
+    *(The `command` and `cwd` paths will be automatically detected based on your installation.)*
+
+5.  **Configure Cursor:** Open your Cursor configuration file (e.g., `~/.cursor/mcp.json`) and paste the copied JSON object into the `"mcpServers"` section (or merge it if the section already exists).
+6.  **Reload MCP Clients:** Reload the clients in Cursor (e.g., via the command palette).
 
 ## Development Setup
 

@@ -103,12 +103,22 @@ def print_mcp_json_config(api_key: str):
              # Provide a template with a placeholder
              executable_path = "/path/to/your/venv/bin/traderfit-bridge" # Placeholder
 
-    # Try to determine a reasonable CWD (usually the project dir if run from source, 
-    # or less relevant if installed system-wide). We'll default to user home for simplicity, 
-    # although logs might go there.
-    # Ideally, logs should go to a standard log location, not cwd.
-    # For now, let's point cwd to where the executable likely is, assuming a venv structure.
-    cwd_path = str(Path(executable_path).parent.parent) if executable_path != "/path/to/your/venv/bin/traderfit-bridge" else "/path/to/traderfit-bridge/project" # Placeholder
+    # --- FIX: Calculate CWD as project root (parent of venv dir) --- #
+    # Assume structure like .../project_root/venv/bin/executable
+    try:
+        # Calculate three levels up from the executable's directory
+        project_root_path = Path(executable_path).parent.parent.parent 
+        # Check if this looks like a plausible project root (e.g., contains pyproject.toml)
+        if (project_root_path / "pyproject.toml").is_file():
+             cwd_path = str(project_root_path.resolve())
+             logger.info(f"Calculated project root CWD: {cwd_path}")
+        else:
+             logger.warning("Could not reliably detect project root based on executable path. Using executable's parent directory as CWD.")
+             cwd_path = str(Path(executable_path).parent.resolve())
+    except Exception as e:
+         logger.error(f"Error calculating CWD path: {e}. Using executable's parent directory.")
+         cwd_path = str(Path(executable_path).parent.resolve())
+    # --- END CWD FIX --- #
     
     # Get backend URL from env or use default (config file logic removed)
     backend_url = os.getenv("TRADERFIT_MCP_URL", "https://traderfit-mcp.skolp.com")

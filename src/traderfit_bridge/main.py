@@ -84,52 +84,38 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 # --- Configuration Generation Function --- #
 def print_mcp_json_config(api_key: str):
     """Generates and prints the command-based mcp.json configuration."""
-    # Try to find the installed executable path
-    executable_path = shutil.which("traderfit-bridge")
-    if not executable_path:
-        # Fallback: Try constructing path relative to current python executable
-        # This is less reliable if installed in different ways
-        python_executable_dir = Path(sys.executable).parent
-        potential_path = python_executable_dir / "traderfit-bridge"
-        if potential_path.is_file():
-            executable_path = str(potential_path.resolve())
-        else:
-             print(
-                "Error: Could not automatically find the 'traderfit-bridge' executable path.\n"
-                "Please ensure the package is installed correctly and the executable is in your PATH,\n"
-                "or specify the full path manually in the 'command' field.", 
-                file=sys.stderr
-             )
-             # Provide a template with a placeholder
-             executable_path = "/path/to/your/venv/bin/traderfit-bridge" # Placeholder
+    # --- Get the path to the current Python interpreter --- #
+    python_executable_path = sys.executable 
+    logger.info(f"Using Python executable: {python_executable_path}")
 
-    # --- FIX: Calculate CWD as project root (parent of venv dir) --- #
-    # Assume structure like .../project_root/venv/bin/executable
+    # --- Calculate CWD based on the Python executable's location --- #
+    # Assume structure like .../project_root/venv/bin/python
+    # So, project root is 3 levels up from the python executable dir
     try:
-        # Calculate three levels up from the executable's directory
-        project_root_path = Path(executable_path).parent.parent.parent 
-        # Check if this looks like a plausible project root (e.g., contains pyproject.toml)
+        project_root_path = Path(python_executable_path).parent.parent.parent
+        # Check if this looks like a plausible project root
         if (project_root_path / "pyproject.toml").is_file():
              cwd_path = str(project_root_path.resolve())
              logger.info(f"Calculated project root CWD: {cwd_path}")
         else:
-             logger.warning("Could not reliably detect project root based on executable path. Using executable's parent directory as CWD.")
-             cwd_path = str(Path(executable_path).parent.resolve())
+             logger.warning("Could not reliably detect project root based on Python executable path. Using executable's parent directory as CWD.")
+             cwd_path = str(Path(python_executable_path).parent.resolve())
     except Exception as e:
          logger.error(f"Error calculating CWD path: {e}. Using executable's parent directory.")
-         cwd_path = str(Path(executable_path).parent.resolve())
-    # --- END CWD FIX --- #
+         cwd_path = str(Path(python_executable_path).parent.resolve())
+    # --- End CWD Calculation --- #
     
-    # Get backend URL from env or use default (config file logic removed)
+    # Get backend URL from env or use default
     backend_url = os.getenv("TRADERFIT_MCP_URL", "https://traderfit-mcp.skolp.com")
 
     config = {
         "mcpServers": {
             "traderfit": {
                 "name": "TraderFit",
-                "description": "TraderFitAI Bridge (via helper script)",
+                "description": "TraderFitAI Bridge (Python Module)", # Updated description
                 "protocol": "stdio",
-                "command": executable_path,
+                "command": python_executable_path, # Use python path
+                "args": ["-m", "traderfit_bridge.main"], # Add args to run module
                 "cwd": cwd_path, 
                 "env": {
                     "TRADERFIT_API_KEY": api_key,

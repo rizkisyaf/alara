@@ -12,6 +12,11 @@ from mcp.server.lowlevel.server import Server, InitializationOptions
 from mcp.server.stdio import stdio_server
 from typing import Any, Dict, List, Optional, Tuple
 
+# --- Add imports for config file handling --- #
+import configparser
+from pathlib import Path
+# --- End imports --- #
+
 # --- Global Logger Setup --- #
 # Determine log level from environment variable, default to INFO
 log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -368,10 +373,10 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
                     for param in operation.parameters:
                             # --- Safely check param.in_ --- #
                             param_location = getattr(param, 'in_', 'unknown')
-                        if param.name in arguments:
+                            if param.name in arguments:
                                 if param_location == "path": # Use safe param_location
-                                path_params[param.name] = arguments[param.name]
-                                elif param_location == "query": # Use safe param_location
+                                    path_params[param.name] = arguments[param.name]
+                            elif param_location == "query": # Use safe param_location
                                 query_params[param.name] = arguments[param.name]
                 if operation.requestBody:
                     body_args = {k: v for k, v in arguments.items() if k not in path_params and k not in query_params}
@@ -390,12 +395,13 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
     # --- FIX: Apply path parameter formatting HERE for non-/by-name routes --- #
     formatted_path = api_path # Start with the determined path (could be /by-name or template)
     if path_params: # Only format if path_params were extracted (i.e., it's NOT a /by-name route)
-    try:
-        formatted_path = api_path.format(**path_params)
+        # --- Indent the try...except block --- #
+        try:
+            formatted_path = api_path.format(**path_params)
             logger.debug(f"Formatted path with params for '{name}': {formatted_path}")
-    except KeyError as e:
-        logger.error(f"Missing path parameter '{e}' for tool '{name}' in arguments: {arguments}")
-        return [types.TextContent(text=f"Error: Missing required path parameter '{e}' for tool '{name}'.")]
+        except KeyError as e:
+            logger.error(f"Missing path parameter '{e}' for tool '{name}' in arguments: {arguments}")
+            return [types.TextContent(text=f"Error: Missing required path parameter '{e}' for tool '{name}'.")]
     # --- END FIX --- #
 
     # Construct the final URL using the (potentially) formatted path
@@ -446,21 +452,82 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
 
 # --- Main Bridge Function (called by entry point) --- #
 async def run_bridge():
-    # ---> ADD EARLY LOG TEST <---
-    logger.info("Entered run_bridge function.")
-    # ---> END LOG TEST <---
-    # Load config from env vars first
+    # ---> ADD EARLY LOG TEST <--- # Removed redundant logging here
+    # logger.info("Entered run_bridge function.")
+    # ---> END LOG TEST <--- #
+
+    # --- Configuration Loading --- #
+    logger.info("Loading configuration...")
+    # Load .env first (primarily for local dev, might override others)
     load_dotenv()
+    
     global TRADERFIT_API_KEY, TRADERFIT_PROD_URL
+    config_file_read = False
+    config = configparser.ConfigParser()
+    config_path = Path.home() / ".config" / "traderfit" / "config.ini"
+
+    # 1. Try Environment Variables First
     TRADERFIT_API_KEY = os.getenv("TRADERFIT_API_KEY")
-    TRADERFIT_PROD_URL = os.getenv("TRADERFIT_MCP_URL", "https://traderfit-mcp.skolp.com") # Default to prod
+    TRADERFIT_PROD_URL = os.getenv("TRADERFIT_MCP_URL")
 
-    # Basic check if API key is provided
+    env_key_found = bool(TRADERFIT_API_KEY)
+    env_url_found = bool(TRADERFIT_PROD_URL)
+    logger.info(f"API Key from environment: {'Found' if env_key_found else 'Not Found'}")
+    logger.info(f"Backend URL from environment: {'Found' if env_url_found else 'Not Found'}")
+
+    # 2. If not found in env, try Config File
+    if not env_key_found or not env_url_found:
+        logger.info(f"Attempting to read config file: {config_path}")
+        try:
+            if config_path.is_file():
+                config.read(config_path)
+                config_file_read = True
+                logger.info(f"Successfully read config file.")
+                
+                # Try getting values from [Credentials] section
+                if not env_key_found:
+                    TRADERFIT_API_KEY = config.get('Credentials', 'api_key', fallback=None)
+                    if TRADERFIT_API_KEY:
+                        logger.info("API Key loaded from config file.")
+                    else:
+                         logger.warning("API Key not found in [Credentials] section of config file.")
+                
+                if not env_url_found:
+                    TRADERFIT_PROD_URL = config.get('Credentials', 'backend_url', fallback=None)
+                    if TRADERFIT_PROD_URL:
+                         logger.info("Backend URL loaded from config file.")
+                    else:
+                         logger.warning("Backend URL not found in [Credentials] section of config file.")
+            else:
+                logger.info(f"Config file not found at {config_path}. Skipping.")
+        except configparser.NoSectionError:
+            logger.warning(f"Config file {config_path} is missing the [Credentials] section.")
+        except configparser.Error as e:
+            logger.error(f"Error reading config file {config_path}: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Unexpected error processing config file {config_path}: {e}", exc_info=True)
+
+    # 3. Use default URL if still not found
+    if not TRADERFIT_PROD_URL:
+        TRADERFIT_PROD_URL = "https://traderfit-mcp.skolp.com"
+        logger.info(f"Using default Backend URL: {TRADERFIT_PROD_URL}")
+
+    # 4. Final Check for API Key
     if not TRADERFIT_API_KEY:
-        logger.critical("CRITICAL ERROR: TRADERFIT_API_KEY environment variable not set!")
-        print("Error: TRADERFIT_API_KEY must be set in the environment.", file=sys.stderr)
-        sys.exit(1)
+        error_msg = (
+            "CRITICAL ERROR: TRADERFIT_API_KEY not found. \n"
+            "Please set the TRADERFIT_API_KEY environment variable OR \n"
+            f"create a config file at '{config_path}' with:\n"
+            "[Credentials]\n"
+            "api_key = YOUR_API_KEY_HERE"
+        )
+        logger.critical(error_msg)
+        print(error_msg, file=sys.stderr) # Print to stderr for visibility
+        sys.exit(1) # Exit if no key is configured
 
+    # --- End Configuration Loading ---
+
+    # --- Original Initialization Logic --- #
     logger.info(f"--- TraderFit StdIO Bridge Initializing ---")
     logger.info(f"Python: {sys.executable}")
     logger.info(f"API Key Loaded: {'Yes'}")
@@ -476,12 +543,12 @@ async def run_bridge():
         call_tool_handler = server.call_tool()(execute_tool_impl)
 
         # --- Await stdio_server directly within run_bridge --- 
-            logger.info("Creating InitializationOptions...")
-            init_options = server.create_initialization_options()
-            logger.info("InitializationOptions created.")
+        logger.info("Creating InitializationOptions...")
+        init_options = server.create_initialization_options()
+        logger.info("InitializationOptions created.")
             
-            logger.info("Starting stdio_server context manager...")
-            async with stdio_server() as (read_stream, write_stream):
+        logger.info("Starting stdio_server context manager...")
+        async with stdio_server() as (read_stream, write_stream):
                 logger.info("stdio_server streams obtained. Running server.run()...")
                 await server.run(read_stream, write_stream, init_options)
                 logger.info("server.run() finished.") 

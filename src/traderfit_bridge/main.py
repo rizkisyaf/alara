@@ -12,10 +12,17 @@ from mcp.server.lowlevel.server import Server, InitializationOptions
 from mcp.server.stdio import stdio_server
 from typing import Any, Dict, List, Optional, Tuple
 
-# --- Add imports for config file handling --- #
-import configparser
-from pathlib import Path
+# --- Remove config file imports --- #
+# import configparser
+# from pathlib import Path
+# --- End Removal --- #
+
+# --- Add imports for helper script --- #
+import argparse
+import json
+import shutil
 # --- End imports --- #
+
 
 # --- Global Logger Setup --- #
 # Determine log level from environment variable, default to INFO
@@ -64,13 +71,64 @@ logger.addHandler(file_handler)   # Add file logging
 logger.propagate = False # Prevent messages from propagating to the root logger
 
 logger.info(f"--- Bridge Restarting --- Logging configured. Level: {log_level_name}. File: {log_file_path} ---")
-# ---> ADD EARLY LOG TEST <---
+# ---> ADD EARLY LOG TEST <--- # Removed
 logger.info("Logger initialization seems complete.")
-# ---> END LOG TEST <---
+# ---> END LOG TEST <--- #
 
 # Prevent libraries (like httpx) from spamming debug logs unless explicitly desired
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+# --- Configuration Generation Function --- #
+def print_mcp_json_config(api_key: str):
+    """Generates and prints the command-based mcp.json configuration."""
+    # Try to find the installed executable path
+    executable_path = shutil.which("traderfit-bridge")
+    if not executable_path:
+        # Fallback: Try constructing path relative to current python executable
+        # This is less reliable if installed in different ways
+        python_executable_dir = Path(sys.executable).parent
+        potential_path = python_executable_dir / "traderfit-bridge"
+        if potential_path.is_file():
+            executable_path = str(potential_path.resolve())
+        else:
+             print(
+                "Error: Could not automatically find the 'traderfit-bridge' executable path.\n"
+                "Please ensure the package is installed correctly and the executable is in your PATH,\n"
+                "or specify the full path manually in the 'command' field.", 
+                file=sys.stderr
+             )
+             # Provide a template with a placeholder
+             executable_path = "/path/to/your/venv/bin/traderfit-bridge" # Placeholder
+
+    # Try to determine a reasonable CWD (usually the project dir if run from source, 
+    # or less relevant if installed system-wide). We'll default to user home for simplicity, 
+    # although logs might go there.
+    # Ideally, logs should go to a standard log location, not cwd.
+    # For now, let's point cwd to where the executable likely is, assuming a venv structure.
+    cwd_path = str(Path(executable_path).parent.parent) if executable_path != "/path/to/your/venv/bin/traderfit-bridge" else "/path/to/traderfit-bridge/project" # Placeholder
+    
+    # Get backend URL from env or use default (config file logic removed)
+    backend_url = os.getenv("TRADERFIT_MCP_URL", "https://traderfit-mcp.skolp.com")
+
+    config = {
+        "mcpServers": {
+            "traderfit": {
+                "name": "TraderFit",
+                "description": "TraderFitAI Bridge (via helper script)",
+                "protocol": "stdio",
+                "command": executable_path,
+                "cwd": cwd_path, 
+                "env": {
+                    "TRADERFIT_API_KEY": api_key,
+                    "TRADERFIT_MCP_URL": backend_url
+                }
+            }
+        }
+    }
+    print(json.dumps(config, indent=4))
+# --- End Config Generation --- #
+
 
 # --- Global Variables (consider class structure later) --- #
 _openapi_schema: Optional[OpenAPI] = None
@@ -452,80 +510,34 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
 
 # --- Main Bridge Function (called by entry point) --- #
 async def run_bridge():
-    # ---> ADD EARLY LOG TEST <--- # Removed redundant logging here
-    # logger.info("Entered run_bridge function.")
-    # ---> END LOG TEST <--- #
-
-    # --- Configuration Loading --- #
-    logger.info("Loading configuration...")
-    # Load .env first (primarily for local dev, might override others)
+    # --- Simplified Configuration Loading (Env Vars Only) --- #
+    logger.info("Loading configuration from environment...")
+    # Load .env first (useful for local dev testing when not run by MCP client)
     load_dotenv()
     
     global TRADERFIT_API_KEY, TRADERFIT_PROD_URL
-    config_file_read = False
-    config = configparser.ConfigParser()
-    config_path = Path.home() / ".config" / "traderfit" / "config.ini"
 
-    # 1. Try Environment Variables First
     TRADERFIT_API_KEY = os.getenv("TRADERFIT_API_KEY")
     TRADERFIT_PROD_URL = os.getenv("TRADERFIT_MCP_URL")
 
-    env_key_found = bool(TRADERFIT_API_KEY)
-    env_url_found = bool(TRADERFIT_PROD_URL)
-    logger.info(f"API Key from environment: {'Found' if env_key_found else 'Not Found'}")
-    logger.info(f"Backend URL from environment: {'Found' if env_url_found else 'Not Found'}")
+    logger.info(f"API Key from environment: {'Found' if TRADERFIT_API_KEY else 'Not Found'}")
+    logger.info(f"Backend URL from environment: {'Found' if TRADERFIT_PROD_URL else 'Not Found'}")
 
-    # 2. If not found in env, try Config File
-    if not env_key_found or not env_url_found:
-        logger.info(f"Attempting to read config file: {config_path}")
-        try:
-            if config_path.is_file():
-                config.read(config_path)
-                config_file_read = True
-                logger.info(f"Successfully read config file.")
-                
-                # Try getting values from [Credentials] section
-                if not env_key_found:
-                    TRADERFIT_API_KEY = config.get('Credentials', 'api_key', fallback=None)
-                    if TRADERFIT_API_KEY:
-                        logger.info("API Key loaded from config file.")
-                    else:
-                         logger.warning("API Key not found in [Credentials] section of config file.")
-                
-                if not env_url_found:
-                    TRADERFIT_PROD_URL = config.get('Credentials', 'backend_url', fallback=None)
-                    if TRADERFIT_PROD_URL:
-                         logger.info("Backend URL loaded from config file.")
-                    else:
-                         logger.warning("Backend URL not found in [Credentials] section of config file.")
-            else:
-                logger.info(f"Config file not found at {config_path}. Skipping.")
-        except configparser.NoSectionError:
-            logger.warning(f"Config file {config_path} is missing the [Credentials] section.")
-        except configparser.Error as e:
-            logger.error(f"Error reading config file {config_path}: {e}", exc_info=True)
-        except Exception as e:
-            logger.error(f"Unexpected error processing config file {config_path}: {e}", exc_info=True)
-
-    # 3. Use default URL if still not found
+    # Use default URL if not found in env
     if not TRADERFIT_PROD_URL:
         TRADERFIT_PROD_URL = "https://traderfit-mcp.skolp.com"
         logger.info(f"Using default Backend URL: {TRADERFIT_PROD_URL}")
 
-    # 4. Final Check for API Key
+    # Final Check for API Key
     if not TRADERFIT_API_KEY:
         error_msg = (
-            "CRITICAL ERROR: TRADERFIT_API_KEY not found. \n"
-            "Please set the TRADERFIT_API_KEY environment variable OR \n"
-            f"create a config file at '{config_path}' with:\n"
-            "[Credentials]\n"
-            "api_key = YOUR_API_KEY_HERE"
+            "CRITICAL ERROR: TRADERFIT_API_KEY environment variable not set!\n"
+            "This bridge expects the API key to be provided by the MCP client environment."
         )
         logger.critical(error_msg)
-        print(error_msg, file=sys.stderr) # Print to stderr for visibility
-        sys.exit(1) # Exit if no key is configured
-
-    # --- End Configuration Loading ---
+        print(error_msg, file=sys.stderr)
+        sys.exit(1)
+    # --- End Simplified Configuration Loading --- #
 
     # --- Original Initialization Logic --- #
     logger.info(f"--- TraderFit StdIO Bridge Initializing ---")
@@ -535,23 +547,24 @@ async def run_bridge():
 
     try:
         # Create the MCP Server Instance
-        server = Server(name="TraderFit", version="0.1.0-packaged") 
+        # Update version string if needed
+        server = Server(name="TraderFit", version="0.1.1") 
         logger.info(f"MCP Server instance '{server.name}' created.")
 
-        # Decorate handlers (functions must be defined before server instance uses them)
+        # Decorate handlers
         list_tools_handler = server.list_tools()(list_available_tools_impl)
         call_tool_handler = server.call_tool()(execute_tool_impl)
 
-        # --- Await stdio_server directly within run_bridge --- 
+        # Await stdio_server directly
         logger.info("Creating InitializationOptions...")
         init_options = server.create_initialization_options()
         logger.info("InitializationOptions created.")
-            
+        
         logger.info("Starting stdio_server context manager...")
         async with stdio_server() as (read_stream, write_stream):
-                logger.info("stdio_server streams obtained. Running server.run()...")
-                await server.run(read_stream, write_stream, init_options)
-                logger.info("server.run() finished.") 
+            logger.info("stdio_server streams obtained. Running server.run()...")
+            await server.run(read_stream, write_stream, init_options)
+            logger.info("server.run() finished.") 
 
     except ImportError as e:
         logger.critical(f"CRITICAL IMPORT ERROR: {e}", exc_info=True)
@@ -565,15 +578,40 @@ async def run_bridge():
         logger.info("--- TraderFit StdIO Bridge Shutting Down --- ")
         logging.shutdown()
 
-# This allows running the script directly for testing if needed, 
-# but the main entry is via the console script defined in pyproject.toml
+# --- Main Execution Block (Handles both running the bridge and printing config) --- #
+def main():
+    parser = argparse.ArgumentParser(description="TraderFit MCP Bridge or Config Helper")
+    parser.add_argument("--api-key", type=str, help="Your TraderFit API Key.")
+    parser.add_argument("--print-mcp-config", action="store_true", help="Print the mcp.json configuration snippet and exit.")
+
+    args = parser.parse_args()
+    # ---> ADD LOGGING to see parsed args <--- #
+    # Use a temporary basic config for logging just in case logger isn't fully set up yet
+    logging.basicConfig(level=logging.INFO) 
+    logging.info(f"Parsed args: {args}")
+    # ---> END LOGGING <--- #
+
+    if args.print_mcp_config:
+        if not args.api_key:
+            print("Error: --api-key is required when using --print-mcp-config", file=sys.stderr)
+            sys.exit(1)
+        print_mcp_json_config(args.api_key)
+        # No need to exit here, function completes
+    else:
+        # Default action: Run the bridge
+        logger.info("Running the async bridge...")
+        try:
+            # Ensure the logger used by run_bridge is configured before calling it
+            # (The setup at the top of the file should handle this)
+            asyncio.run(run_bridge())
+        except Exception as e:
+            # Use logger if available, otherwise print
+            log_func = logger.critical if logger else print
+            log_func(f"Unhandled exception during bridge run: {e}", exc_info=True)
+            sys.exit(1) # Exit with error code if bridge crashes
+        finally:
+             if logger:
+                  logger.info("Async bridge run finished or exited.")
+
 if __name__ == "__main__":
-    # ---> ADD EARLY LOG TEST <---
-    logger.info("Entering __main__ block.")
-    # ---> END LOG TEST <---
-    try:
-        asyncio.run(run_bridge())
-    except Exception as e:
-        logger.critical(f"Unhandled exception in main execution block: {e}", exc_info=True)
-    finally:
-        logger.info("Bridge script exiting __main__ block.") 
+    main()

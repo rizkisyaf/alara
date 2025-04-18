@@ -1,1 +1,0 @@
-# This file makes traderfit_mcp_stdio_bridge a Python package 

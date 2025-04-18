@@ -329,6 +329,8 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
     # Find the operation matching the tool name (operationId)
     found_op = False
     original_schema_path = None # Store the original path template for reference
+    target_operation: Optional[Operation] = None # Store the found operation
+
     for path, path_item in schema.paths.items():
         if found_op: break
         operations: List[Tuple[str, Optional[Operation]]] = [
@@ -339,128 +341,83 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
             if operation and operation.operationId == name:
                 http_method = method
                 original_schema_path = path # Store the path from the schema
-
-                # List of refactored operation IDs that now use /by-name and exchange_name query param
-                refactored_tool_names = {
-                    # Use the full operationId names from the API schema
-                    "get_exchange_balance_by_name", 
-                    "get_exchange_ticker_by_name", 
-                    "get_exchange_ohlcv_by_name", 
-                    "get_exchange_order_book_by_name",
-                    "get_exchange_funding_rate_by_name", 
-                    "get_exchange_my_trades_by_name", 
-                    "get_exchange_open_orders_by_name",
-                    "get_exchange_closed_orders_by_name", 
-                    "get_exchange_positions_by_name", 
-                    # These were likely correct already, but ensure consistency
-                    "delete_exchange_key", 
-                    "sync_exchange_trades", 
-                    "disconnect_exchange"
-                }
-
-                # --- NEW LOGIC for /by-name endpoints ---
-                if name in refactored_tool_names:
-                    logger.info(f"{log_prefix} Entered /by-name logic for {name}") 
-                    # Determine the correct /by-name path structure
-                    # --- FIX: Use the path directly from the schema for /by-name tools --- 
-                    api_path = original_schema_path 
-                    logger.debug(f"{log_prefix} Tool '{name}' uses path directly from schema: {api_path}")
-                    # --- REMOVE OLD/INCORRECT PATH CONSTRUCTION ---
-                    # if name == "delete_exchange_key":
-                    #     api_path = f"/api/exchange-keys/by-name"
-                    # elif name == "sync_exchange_trades":
-                    #     api_path = f"/api/exchanges/sync/by-name"
-                    # elif name == "disconnect_exchange":
-                    #     api_path = f"/api/exchanges/disconnect/by-name"
-                    # else: # Assume others follow the /api/exchanges/data/.../by-name pattern
-                    #     # Extract the data type (e.g., 'balance', 'ticker') from the original path
-                    #     # ---> ADD LOGGING FOR ORIGINAL PATH <---
-                    #     logger.debug(f"{log_prefix} For tool '{name}', original_schema_path is: {original_schema_path}")
-                    #     # ---> END LOGGING <---
-                    #     path_parts = original_schema_path.split('/')
-                    #     # Example original path: '/api/exchanges/data/{connection_id}/balance'
-                    #     # We expect the data type to be the last part
-                    #     if len(path_parts) > 0:
-                    #          data_type = path_parts[-1]
-                    #          api_path = f"/api/exchanges/data/{data_type}/by-name"
-                    #          logger.info(f"{log_prefix} Constructed /by-name data path: {api_path}")
-                    #     else:
-                    #          logger.error(f"{log_prefix} Could not determine data type from original path '{original_schema_path}' for tool '{name}'")
-                    #          logger.warning(f"{log_prefix} Returning early due to path determination error.")
-                    #          return [types.TextContent(text="ERROR_HANDLER_REACHED_PATH_DETERMINATION")]
-                    # logger.debug(f"{log_prefix} Tool '{name}' uses '/by-name' path: {api_path}") 
-                    # --- END REMOVAL ---
-
-                    # Extract exchange_name for query params (Mandatory for these tools)
-                    if "exchange_name" not in arguments:
-                        logger.error(f"{log_prefix} Missing required parameter 'exchange_name' for tool '{name}'")
-                        logger.warning(f"{log_prefix} Returning early due to missing exchange_name.")
-                        return [types.TextContent(type="text", text="ERROR_HANDLER_REACHED_MISSING_EXCHANGE_NAME")]
-                    query_params["exchange_name"] = arguments["exchange_name"]
-
-                    # Extract other potential query/body params based on OpenAPI spec
-                    if operation.parameters:
-                        for param in operation.parameters:
-                            # Skip path params (like connection_id) and exchange_name (already handled)
-                            # --- Safely check param.in_ --- #
-                            param_location = getattr(param, 'in_', 'unknown')
-                            if param_location == "path" or param.name == "exchange_name": continue
-                            
-                            if param.name in arguments:
-                                if param_location == "query": # Use safe param_location
-                                    query_params[param.name] = arguments[param.name]
-                                # Note: Body params are handled via requestBody below, not here
-
-                    # Handle request body (e.g., for sync_trades)
-                    if operation.requestBody:
-                        # Extract args that aren't exchange_name and aren't defined as query params
-                        potential_body_args = {k: v for k, v in arguments.items() if k != "exchange_name" and k not in query_params}
-                        # We should ideally check against the requestBody schema, but for now, assume these are body args
-                        if potential_body_args:
-                            request_body = potential_body_args
-                            logger.debug(f"{log_prefix} Identified request body for {name}: {request_body}")
-
-                # --- ORIGINAL LOGIC for other endpoints ---
-                else:
-                    api_path = original_schema_path # Use the original path from schema
-                    logger.info(f"{log_prefix} Using standard path: {api_path}")
-                    logger.debug(f"{log_prefix} Tool '{name}' uses standard path: {api_path}")
-                if operation.parameters:
-                    for param in operation.parameters:
-                            # --- Safely check param.in_ --- #
-                            param_location = getattr(param, 'in_', 'unknown')
-                            if param.name in arguments:
-                                if param_location == "path": # Use safe param_location
-                                    path_params[param.name] = arguments[param.name]
-                            elif param_location == "query": # Use safe param_location
-                                query_params[param.name] = arguments[param.name]
-                if operation.requestBody:
-                    body_args = {k: v for k, v in arguments.items() if k not in path_params and k not in query_params}
-                    if body_args: request_body = body_args
-
+                target_operation = operation # Store the operation object
                 found_op = True
                 break # Exit the inner loop (methods)
-
-    if not found_op:
+    
+    if not found_op or not target_operation or not original_schema_path or not http_method:
         logger.error(f"Could not find API endpoint details for tool '{name}' in schema.")
+        # Combine checks for clarity
         return [types.TextContent(text=f"Error: Configuration error for tool '{name}'. Is the operationId correct in the schema and bridge filter?")]
-    if not api_path or not http_method: # Should be set if found_op is True
-        logger.error(f"Internal error: Found operation for '{name}' but path or method is missing.")
-        return [types.TextContent(text=f"Internal bridge error processing tool '{name}'.")]
 
-    # --- FIX: Apply path parameter formatting HERE for non-/by-name routes --- #
-    formatted_path = api_path # Start with the determined path (could be /by-name or template)
-    if path_params: # Only format if path_params were extracted (i.e., it's NOT a /by-name route)
-        # --- Indent the try...except block --- #
+    # --- Unified Parameter Extraction ---
+    logger.debug(f"{log_prefix} Processing parameters for {name} using path: {original_schema_path}")
+    # ---> Log the raw parameters object from the parsed schema <--- 
+    logger.debug(f"{log_prefix} Parsed schema parameters object for operation: {target_operation.parameters}")
+    # ---> End logging < ---
+    if target_operation.parameters:
+        # ---> Log all parameters found in schema for this operation <--- 
+        param_details_log = [f'(Name: {p.name}, In: {getattr(p, "param_in", "N/A")}, Req: {getattr(p, "required", "N/A")})' for p in target_operation.parameters]
+        logger.debug(f"{log_prefix} Schema defines parameters: {param_details_log}")
+        # ---> End logging < ---
+        
+        for param in target_operation.parameters:
+            # Corrected: Use 'param_in' instead of 'in_'
+            param_location_enum = getattr(param, 'param_in', None) 
+            param_location = param_location_enum.value if param_location_enum else 'unknown' # Get string value e.g. "query"
+            param_name = param.name # param.name
+            # ---> Log details for THIS specific parameter being processed <---
+            logger.debug(f"{log_prefix} Processing schema param -> Name: {param_name}, Location: {param_location}")
+            # ---> End logging < ---
+            
+            if param_name in arguments: # Check if the schema param name exists in the arguments WE RECEIVED
+                if param_location == "path":
+                    path_params[param_name] = arguments[param_name]
+                    logger.debug(f"{log_prefix} Extracted path param: {param_name}={arguments[param_name]}")
+                elif param_location == "query":
+                    query_params[param_name] = arguments[param_name]
+                    logger.debug(f"{log_prefix} Extracted query param: {param_name}={arguments[param_name]}")
+                # Handle other locations like 'header', 'cookie' if necessary
+            elif getattr(param, 'required', False):
+                 logger.error(f"{log_prefix} Missing required parameter '{param_name}' (in: {param_location}) for tool '{name}'")
+                 return [types.TextContent(text=f"Error: Missing required parameter '{param_name}' for tool '{name}'.")]
+
+    # --- Handle Request Body ---
+    # Extract arguments that are not path or query parameters defined in the spec
+    defined_param_names = set(path_params.keys()) | set(query_params.keys())
+    potential_body_args = {k: v for k, v in arguments.items() if k not in defined_param_names}
+
+    # Check if the operation expects a requestBody and if we have potential body args
+    if target_operation.requestBody and potential_body_args:
+        # Basic check: Use the extracted args as the body. 
+        # More robust check: Validate against requestBody schema if needed.
+        request_body = potential_body_args
+        logger.debug(f"{log_prefix} Identified request body: {request_body}")
+    elif potential_body_args:
+        logger.warning(f"{log_prefix} Arguments {list(potential_body_args.keys())} were provided but not defined as path/query params and no requestBody is specified in schema.")
+        # Decide whether to ignore these or treat as an error
+
+    # --- Path Formatting ---
+    api_path = original_schema_path # Use the original path template
+    formatted_path = api_path # Initialize formatted_path
+    
+    # Check if path actually needs formatting
+    if "{" in api_path and "}" in api_path: 
+        if not path_params:
+             logger.error(f"Path '{api_path}' requires parameters, but none were extracted or provided for tool '{name}'. Args: {arguments}")
+             return [types.TextContent(text=f"Error: Path '{api_path}' requires parameters, but none were provided in arguments.")]
         try:
+            # Apply formatting using extracted path_params
             formatted_path = api_path.format(**path_params)
-            logger.debug(f"Formatted path with params for '{name}': {formatted_path}")
+            logger.info(f"Formatted path with params for '{name}': {formatted_path}")
         except KeyError as e:
-            logger.error(f"Missing path parameter '{e}' for tool '{name}' in arguments: {arguments}")
-            return [types.TextContent(text=f"Error: Missing required path parameter '{e}' for tool '{name}'.")]
-    # --- END FIX --- #
+            logger.error(f"Missing path parameter key '{e}' during formatting for tool '{name}'. Path: '{api_path}', Params: {path_params}")
+            return [types.TextContent(text=f"Error: Missing required path parameter value for '{e}' in tool '{name}'.")]
+    else:
+         logger.info(f"Path '{api_path}' does not require formatting.")
 
-    # Construct the final URL using the (potentially) formatted path
+
+    # Construct the final URL using the formatted path
     api_url = f"{TRADERFIT_PROD_URL}{formatted_path}"
 
     # *** Ensure the correct header name is used ***

@@ -1,4 +1,4 @@
-# TraderFit Bridge (StdIO)
+# Alara Bridge (StdIO)
 
 This package provides a Machine Cognition Protocol (MCP) bridge using standard input/output (stdio) to connect an MCP client (like Cursor) to the Alara backend API.
 
@@ -12,7 +12,7 @@ This package provides a Machine Cognition Protocol (MCP) bridge using standard i
 
 ```bash
 # Install from PyPI
-pip install traderfit-bridge
+pip install alara
 ```
 
 ## Configuration
@@ -21,12 +21,12 @@ This bridge uses the command-based configuration method for MCP clients like Cur
 
 1.  **Install the package:**
     ```bash
-    pip install traderfit-bridge
+    pip install alara
     ```
 2.  **Generate your API Key:** Obtain your API key from the Alara platform dashboard.
-3.  **Generate MCP Configuration:** Run the following command in your terminal, replacing `YOUR_TRADERFIT_API_KEY_HERE` with the key you obtained:
+3.  **Generate MCP Configuration:** Run the following command in your terminal, replacing `YOUR_ALARA_API_KEY_HERE` with the key you obtained:
     ```bash
-    python -m traderfit_bridge.main --api-key YOUR_TRADERFIT_API_KEY_HERE --print-mcp-config
+    python -m alara.main --api-key YOUR_ALARA_API_KEY_HERE --print-mcp-config
     ```
     *(Note: If `python` doesn't work, try `python3`)*
 
@@ -34,15 +34,16 @@ This bridge uses the command-based configuration method for MCP clients like Cur
     ```json
     {
         "mcpServers": {
-            "traderfit": {
-                "name": "TraderFit",
-                "description": "Alara Bridge (via helper script)",
+            "alara": {
+                "name": "Alara",
+                "description": "Alara Bridge (Python Module)",
                 "protocol": "stdio",
-                "command": "/path/to/installed/traderfit-bridge", // Automatically detected path
-                "cwd": "/path/to/parent/of/command", // Automatically detected path
+                "command": "/path/to/installed/python", // Path to python in venv
+                "args": ["-m", "alara.main"],
+                "cwd": "/path/to/alara/project/root",
                 "env": {
-                    "TRADERFIT_API_KEY": "YOUR_TRADERFIT_API_KEY_HERE", // Your key inserted here
-                    "TRADERFIT_MCP_URL": "https://traderfit-mcp.skolp.com"
+                    "ALARA_API_KEY": "YOUR_ALARA_API_KEY_HERE", // Your key inserted here
+                    "ALARA_MCP_URL": "https://alara-mcp.skolp.com" // Changed default backend URL
                 }
             }
         }
@@ -57,8 +58,8 @@ This bridge uses the command-based configuration method for MCP clients like Cur
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/rizkisyaf/traderfit-bridge.git
-    cd traderfit-bridge
+    git clone https://github.com/rizkisyaf/alara.git
+    cd alara
     ```
 2.  Create a Python virtual environment:
     ```bash
@@ -73,15 +74,15 @@ This bridge uses the command-based configuration method for MCP clients like Cur
 
 4. Create a `.env` file in the project root with your API key for local testing:
    ```dotenv
-   TRADERFIT_API_KEY=YOUR_TRADERFIT_API_KEY_HERE
-   TRADERFIT_MCP_URL=https://traderfit-mcp.skolp.com 
+   ALARA_API_KEY=YOUR_ALARA_API_KEY_HERE
+   ALARA_MCP_URL=https://alara-mcp.skolp.com # Changed default backend URL
    # Optional: Set LOG_LEVEL=DEBUG for more verbose logging
    # LOG_LEVEL=DEBUG 
    ```
 
 5. Run the bridge directly (for testing purposes):
    ```bash
-   python -m traderfit_bridge.main 
+   python -m alara.main 
    ```
 
 ## License

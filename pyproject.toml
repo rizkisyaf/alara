@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "traderfit-bridge"
-version = "0.2.9"
+name = "alara"
+version = "0.3.2"
 authors = [
   { name="Kisra Fistya", email="kisra.fistya@gmail.com" },
 ]
-description = "A stdio bridge for the TraderFit MCP API"
+description = "A stdio bridge for the Alara MCP API"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -24,11 +24,11 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/rizkisyaf/traderfit-bridge"
-"Bug Tracker" = "https://github.com/rizkisyaf/traderfit-bridge/issues"
+"Homepage" = "https://github.com/rizkisyaf/alara"
+"Bug Tracker" = "https://github.com/rizkisyaf/alara/issues"
 
 [project.scripts]
-traderfit-bridge = "traderfit_bridge.main:run_bridge"
+alara = "alara.main:run_bridge"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # look for packages in the src directory

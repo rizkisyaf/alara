@@ -7,14 +7,14 @@ async def main():
     # Load environment variables from .env file in the current directory
     load_dotenv()
 
-    api_key = os.getenv("TRADERFIT_API_KEY")
-    base_url = os.getenv("TRADERFIT_MCP_URL", "https://traderfit-mcp.skolp.com")
+    api_key = os.getenv("ALARA_API_KEY")
+    base_url = os.getenv("ALARA_MCP_URL", "https://alara-mcp.skolp.com")
 
     if not api_key:
-        print("Error: TRADERFIT_API_KEY not found in environment/.env")
+        print("Error: ALARA_API_KEY not found in environment/.env")
         return
     if not base_url:
-        print("Error: TRADERFIT_MCP_URL not found in environment/.env")
+        print("Error: ALARA_MCP_URL not found in environment/.env")
         return
 
     # --- Test Configuration ---

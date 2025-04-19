@@ -8,17 +8,30 @@ cd "$(dirname "$0")"
 
 PYPROJECT_FILE="pyproject.toml"
 
-# Activate virtual environment if it exists (adjust path if needed)
-if [ -d "venv" ]; then
-  echo "Activating virtual environment..."
-  source venv/bin/activate
-else
-  echo "Warning: No virtual environment found/activated."
-fi
+# --- Recreate Virtual Environment --- #
+
+# 1. Remove existing venv if it exists
+echo "Removing old virtual environment (if any)..."
+rm -rf venv
+
+# 2. Create a new virtual environment
+echo "Creating new virtual environment..."
+python3 -m venv venv
+
+# 3. Activate virtual environment (for consistency, though we use explicit paths)
+# Not strictly needed now, but good practice
+echo "Activating virtual environment..."
+source venv/bin/activate
+
+# 4. Install necessary build/upload tools into the NEW venv
+echo "Installing build tools (build, twine, setuptools) into venv..."
+./venv/bin/pip install --upgrade pip build twine "setuptools>=61.0"
+
+# --- End Recreate Virtual Environment --- #
 
 # 1. Uninstall existing package (ignore errors if not found)
-echo "Uninstalling existing traderfit-bridge..."
-pip uninstall -y traderfit-bridge || echo "traderfit-bridge not found or already uninstalled."
+echo "Uninstalling existing alara..."
+./venv/bin/pip uninstall -y alara || echo "alara not found or already uninstalled."
 
 # 2. Remove old distribution files
 echo "Removing old dist directory..."
@@ -50,21 +63,21 @@ echo "Version updated in $PYPROJECT_FILE"
 
 # 3. Build the new package
 echo "Building new package (version $new_version)..."
-python -m build
+./venv/bin/python3 -m build
 
 # 4. Upload to PyPI using Twine
 echo "Uploading package using Twine..."
 # Ensure you have twine installed (pip install twine)
 # You might need to configure credentials for twine (e.g., ~/.pypirc or environment variables)
-python -m twine upload dist/*
+./venv/bin/python3 -m twine upload dist/*
 
 # 5. Wait for PyPI to potentially update
 echo "Waiting 5 seconds for PyPI index..."
 sleep 5
 
 # 6. Reinstall the package from PyPI
-echo "Reinstalling traderfit-bridge version $new_version from PyPI..."
+echo "Reinstalling alara version $new_version from PyPI..."
 # Use --no-cache-dir to ensure the latest version is fetched
-pip install --no-cache-dir traderfit-bridge==$new_version
+./venv/bin/pip install --no-cache-dir alara==$new_version
 
 echo "Process complete." 

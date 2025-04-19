@@ -1,5 +1,5 @@
 import sys
-print("TraderFit Bridge Starting...", file=sys.stderr)
+print("Alara Bridge Starting...", file=sys.stderr)
 
 import logging
 import os
@@ -40,13 +40,13 @@ stderr_handler.setFormatter(formatter)
 
 # Ensure log file path is correct relative to script or cwd if needed
 # Assuming cwd is Alara/ as set in mcp.json
-# log_file_path = os.path.join(os.getcwd(), "traderfit-bridge", "bridge_server.log") 
+# log_file_path = os.path.join(os.getcwd(), "alara", "alara.log") # Updated example path
 # If cwd isn't reliable, use script directory:
 # Calculate path relative to this script file (main.py)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-# Go up two levels (src/traderfit_bridge -> traderfit-bridge)
+# Go up two levels (src/alara -> alara)
 project_root = os.path.dirname(os.path.dirname(script_dir))
-log_file_path = os.path.join(project_root, "bridge_server.log")
+log_file_path = os.path.join(project_root, "alara.log")
 
 # Create directory if it doesn't exist
 os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
@@ -60,19 +60,19 @@ root_logger = logging.getLogger()
 for handler in root_logger.handlers[:]:
     root_logger.removeHandler(handler)
 # Remove all handlers associated with the logger object from the previous run.
-logger_instance = logging.getLogger("TraderFitStdioBridge")
+logger_instance = logging.getLogger("AlaraStdioBridge")
 for handler in logger_instance.handlers[:]:
     logger_instance.removeHandler(handler)
 
 
 # Configure the specific logger
-logger = logging.getLogger("TraderFitStdioBridge")
+logger = logging.getLogger("AlaraStdioBridge")
 logger.setLevel(log_level) 
 logger.addHandler(stderr_handler) # Keep stderr for immediate feedback if needed
 logger.addHandler(file_handler)   # Add file logging
 logger.propagate = False # Prevent messages from propagating to the root logger
 
-logger.info(f"--- Bridge Restarting --- Logging configured. Level: {log_level_name}. File: {log_file_path} ---")
+logger.info(f"--- Alara StdIO Bridge Initializing --- Logging configured. Level: {log_level_name}. File: {log_file_path} ---")
 # ---> ADD EARLY LOG TEST <--- # Removed
 logger.info("Logger initialization seems complete.")
 # ---> END LOG TEST <--- #
@@ -106,20 +106,20 @@ def print_mcp_json_config(api_key: str):
     # --- End CWD Calculation --- #
     
     # Get backend URL from env or use default
-    backend_url = os.getenv("TRADERFIT_MCP_URL", "https://traderfit-mcp.skolp.com")
+    backend_url = os.getenv("ALARA_MCP_URL", "https://alara-mcp.skolp.com")
 
     config = {
         "mcpServers": {
-            "traderfit": {
-                "name": "TraderFit",
-                "description": "Alara Bridge (Python Module)", # Updated description
+            "alara": {
+                "name": "Alara",
+                "description": "Alara Bridge (Python Module)",
                 "protocol": "stdio",
-                "command": python_executable_path, # Use python path
-                "args": ["-m", "traderfit_bridge.main"], # Add args to run module
+                "command": python_executable_path,
+                "args": ["-m", "alara.main"],
                 "cwd": cwd_path, 
                 "env": {
-                    "TRADERFIT_API_KEY": api_key,
-                    "TRADERFIT_MCP_URL": backend_url
+                    "ALARA_API_KEY": api_key,
+                    "ALARA_MCP_URL": backend_url
                 }
             }
         }
@@ -130,24 +130,24 @@ def print_mcp_json_config(api_key: str):
 
 # --- Global Variables (consider class structure later) --- #
 _openapi_schema: Optional[OpenAPI] = None
-TRADERFIT_API_KEY: Optional[str] = None
-TRADERFIT_PROD_URL: Optional[str] = None
+ALARA_API_KEY: Optional[str] = None
+ALARA_PROD_URL: Optional[str] = None
 
 # --- Helper to Fetch OpenAPI Schema --- #
 async def get_openapi_schema() -> Optional[OpenAPI]:
-    global _openapi_schema, TRADERFIT_API_KEY # Ensure API key is accessible
+    global _openapi_schema, ALARA_API_KEY
     if _openapi_schema:
         return _openapi_schema
     
-    if not TRADERFIT_PROD_URL:
-        logger.error("TRADERFIT_MCP_URL not configured.")
+    if not ALARA_PROD_URL:
+        logger.error("ALARA_MCP_URL not configured.")
         return None
-    if not TRADERFIT_API_KEY: # Check for API Key
-        logger.error("TRADERFIT_API_KEY not configured.")
+    if not ALARA_API_KEY:
+        logger.error("ALARA_API_KEY not configured.")
         return None
 
-    schema_url = f"{TRADERFIT_PROD_URL}/openapi.json"
-    headers = {"X-API-Key": TRADERFIT_API_KEY} # Add API Key header
+    schema_url = f"{ALARA_PROD_URL}/openapi.json"
+    headers = {"X-API-Key": ALARA_API_KEY}
     logger.info(f"Attempting to fetch OpenAPI schema from {schema_url} using API key.")
     try:
         async with httpx.AsyncClient() as client:
@@ -311,7 +311,7 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
 
     if not arguments: arguments = {} # Ensure arguments is always a dict
 
-    if not TRADERFIT_API_KEY or not TRADERFIT_PROD_URL:
+    if not ALARA_API_KEY or not ALARA_PROD_URL:
         logger.error(f"{log_prefix} API Key or URL not configured for tool execution.")
         return [types.TextContent(type="text", text="Error: Bridge not configured correctly (API Key/URL missing).")]
 
@@ -418,11 +418,11 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
 
 
     # Construct the final URL using the formatted path
-    api_url = f"{TRADERFIT_PROD_URL}{formatted_path}"
+    api_url = f"{ALARA_PROD_URL}{formatted_path}"
 
     # *** Ensure the correct header name is used ***
-    # Common alternatives: "Authorization": f"Bearer {TRADERFIT_API_KEY}"
-    headers = {"X-API-Key": TRADERFIT_API_KEY}
+    # Common alternatives: "Authorization": f"Bearer {ALARA_API_KEY}"
+    headers = {"X-API-Key": ALARA_API_KEY}
     
     # ---> ADD LOGGING FOR FINAL URL <---
     logger.info(f"{log_prefix} Attempting to call final URL: {http_method} {api_url}")
@@ -470,23 +470,23 @@ async def run_bridge():
     # Load .env first (useful for local dev testing when not run by MCP client)
     load_dotenv()
     
-    global TRADERFIT_API_KEY, TRADERFIT_PROD_URL
+    global ALARA_API_KEY, ALARA_PROD_URL
 
-    TRADERFIT_API_KEY = os.getenv("TRADERFIT_API_KEY")
-    TRADERFIT_PROD_URL = os.getenv("TRADERFIT_MCP_URL")
+    ALARA_API_KEY = os.getenv("ALARA_API_KEY")
+    ALARA_PROD_URL = os.getenv("ALARA_MCP_URL")
 
-    logger.info(f"API Key from environment: {'Found' if TRADERFIT_API_KEY else 'Not Found'}")
-    logger.info(f"Backend URL from environment: {'Found' if TRADERFIT_PROD_URL else 'Not Found'}")
+    logger.info(f"API Key from environment: {'Found' if ALARA_API_KEY else 'Not Found'}")
+    logger.info(f"Backend URL from environment: {'Found' if ALARA_PROD_URL else 'Not Found'}")
 
     # Use default URL if not found in env
-    if not TRADERFIT_PROD_URL:
-        TRADERFIT_PROD_URL = "https://traderfit-mcp.skolp.com"
-        logger.info(f"Using default Backend URL: {TRADERFIT_PROD_URL}")
+    if not ALARA_PROD_URL:
+        ALARA_PROD_URL = "https://alara-mcp.skolp.com"
+        logger.info(f"Using default Backend URL: {ALARA_PROD_URL}")
 
     # Final Check for API Key
-    if not TRADERFIT_API_KEY:
+    if not ALARA_API_KEY:
         error_msg = (
-            "CRITICAL ERROR: TRADERFIT_API_KEY environment variable not set!\n"
+            "CRITICAL ERROR: ALARA_API_KEY environment variable not set!\n"
             "This bridge expects the API key to be provided by the MCP client environment."
         )
         logger.critical(error_msg)
@@ -495,15 +495,15 @@ async def run_bridge():
     # --- End Simplified Configuration Loading --- #
 
     # --- Original Initialization Logic --- #
-    logger.info(f"--- TraderFit StdIO Bridge Initializing ---")
+    logger.info(f"--- Alara StdIO Bridge Initializing ---")
     logger.info(f"Python: {sys.executable}")
     logger.info(f"API Key Loaded: {'Yes'}")
-    logger.info(f"Target API URL: {TRADERFIT_PROD_URL}")
+    logger.info(f"Target API URL: {ALARA_PROD_URL}")
 
     try:
         # Create the MCP Server Instance
         # Update version string if needed
-        server = Server(name="TraderFit", version="0.1.1") 
+        server = Server(name="Alara", version="0.1.1")
         logger.info(f"MCP Server instance '{server.name}' created.")
 
         # Decorate handlers
@@ -530,13 +530,13 @@ async def run_bridge():
         print(f"Critical runtime error: {e}", file=sys.stderr)
         sys.exit(1)
     finally:
-        logger.info("--- TraderFit StdIO Bridge Shutting Down --- ")
+        logger.info("--- Alara StdIO Bridge Shutting Down --- ")
         logging.shutdown()
 
 # --- Main Execution Block (Handles both running the bridge and printing config) --- #
 def main():
-    parser = argparse.ArgumentParser(description="TraderFit MCP Bridge or Config Helper")
-    parser.add_argument("--api-key", type=str, help="Your TraderFit API Key.")
+    parser = argparse.ArgumentParser(description="Alara MCP Bridge or Config Helper")
+    parser.add_argument("--api-key", type=str, help="Your Alara API Key.")
     parser.add_argument("--print-mcp-config", action="store_true", help="Print the mcp.json configuration snippet and exit.")
 
     args = parser.parse_args()

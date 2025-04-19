@@ -39,7 +39,7 @@ stderr_handler = logging.StreamHandler(sys.stderr)
 stderr_handler.setFormatter(formatter)
 
 # Ensure log file path is correct relative to script or cwd if needed
-# Assuming cwd is TraderFitAI/ as set in mcp.json
+# Assuming cwd is Alara/ as set in mcp.json
 # log_file_path = os.path.join(os.getcwd(), "traderfit-bridge", "bridge_server.log") 
 # If cwd isn't reliable, use script directory:
 # Calculate path relative to this script file (main.py)
@@ -112,7 +112,7 @@ def print_mcp_json_config(api_key: str):
         "mcpServers": {
             "traderfit": {
                 "name": "TraderFit",
-                "description": "TraderFitAI Bridge (Python Module)", # Updated description
+                "description": "Alara Bridge (Python Module)", # Updated description
                 "protocol": "stdio",
                 "command": python_executable_path, # Use python path
                 "args": ["-m", "traderfit_bridge.main"], # Add args to run module

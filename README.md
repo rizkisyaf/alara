@@ -1,11 +1,11 @@
 # TraderFit Bridge (StdIO)
 
-This package provides a Machine Cognition Protocol (MCP) bridge using standard input/output (stdio) to connect an MCP client (like Cursor) to the TraderFitAI backend API.
+This package provides a Machine Cognition Protocol (MCP) bridge using standard input/output (stdio) to connect an MCP client (like Cursor) to the Alara backend API.
 
 ## Features
 
-*   Dynamically fetches available tools from the TraderFitAI OpenAPI schema.
-*   Executes tool calls by forwarding requests to the TraderFitAI API.
+*   Dynamically fetches available tools from the Alara OpenAPI schema.
+*   Executes tool calls by forwarding requests to the Alara API.
 *   Authenticates with the backend using an API key provided via environment variable.
 
 ## Installation
@@ -23,7 +23,7 @@ This bridge uses the command-based configuration method for MCP clients like Cur
     ```bash
     pip install traderfit-bridge
     ```
-2.  **Generate your API Key:** Obtain your API key from the TraderFitAI platform dashboard.
+2.  **Generate your API Key:** Obtain your API key from the Alara platform dashboard.
 3.  **Generate MCP Configuration:** Run the following command in your terminal, replacing `YOUR_TRADERFIT_API_KEY_HERE` with the key you obtained:
     ```bash
     python -m traderfit_bridge.main --api-key YOUR_TRADERFIT_API_KEY_HERE --print-mcp-config
@@ -36,7 +36,7 @@ This bridge uses the command-based configuration method for MCP clients like Cur
         "mcpServers": {
             "traderfit": {
                 "name": "TraderFit",
-                "description": "TraderFitAI Bridge (via helper script)",
+                "description": "Alara Bridge (via helper script)",
                 "protocol": "stdio",
                 "command": "/path/to/installed/traderfit-bridge", // Automatically detected path
                 "cwd": "/path/to/parent/of/command", // Automatically detected path

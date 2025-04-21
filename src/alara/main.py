@@ -466,33 +466,28 @@ async def execute_tool_impl(name: str, arguments: Dict[str, Any] | None) -> List
 # --- Main Bridge Function (called by entry point) --- #
 async def run_bridge():
     # --- Simplified Configuration Loading (Env Vars Only) --- #
+    global ALARA_API_KEY, ALARA_PROD_URL # Ensure we modify the globals
     logger.info("Loading configuration from environment...")
-    # Load .env first (useful for local dev testing when not run by MCP client)
-    load_dotenv()
-    
-    global ALARA_API_KEY, ALARA_PROD_URL
 
-    ALARA_API_KEY = os.getenv("ALARA_API_KEY")
-    ALARA_PROD_URL = os.getenv("ALARA_MCP_URL")
-
-    logger.info(f"API Key from environment: {'Found' if ALARA_API_KEY else 'Not Found'}")
-    logger.info(f"Backend URL from environment: {'Found' if ALARA_PROD_URL else 'Not Found'}")
-
-    # Use default URL if not found in env
-    if not ALARA_PROD_URL:
-        ALARA_PROD_URL = "https://alara-mcp.skolp.com"
-        logger.info(f"Using default Backend URL: {ALARA_PROD_URL}")
-
-    # Final Check for API Key
+    # --- CORRECTED ENVIRONMENT VARIABLE NAME --- #
+    ALARA_API_KEY = os.getenv("ALARA_API_KEY") 
     if not ALARA_API_KEY:
-        error_msg = (
-            "CRITICAL ERROR: ALARA_API_KEY environment variable not set!\n"
-            "This bridge expects the API key to be provided by the MCP client environment."
-        )
-        logger.critical(error_msg)
-        print(error_msg, file=sys.stderr)
-        sys.exit(1)
-    # --- End Simplified Configuration Loading --- #
+        logger.info("API Key from environment: Not Found")
+        logger.critical("CRITICAL ERROR: ALARA_API_KEY environment variable not set!") # Updated Error Message
+        logger.critical("This bridge expects the API key to be provided by the MCP client environment.")
+        return # Exit the async function
+    else:
+        logger.info("API Key from environment: Found (masked)")
+        logger.debug(f"API Key Loaded: {ALARA_API_KEY[:4]}...{ALARA_API_KEY[-4:]}")
+
+    ALARA_PROD_URL = os.getenv("ALARA_MCP_URL")
+    if not ALARA_PROD_URL:
+        logger.info("Backend URL from environment: Not Found")
+        ALARA_PROD_URL = "https://alara-mcp.skolp.com" # Default URL
+        logger.info(f"Using default Backend URL: {ALARA_PROD_URL}")
+    else:
+         logger.info(f"Using Backend URL from environment: {ALARA_PROD_URL}")
+    # --- End Configuration Loading --- #
 
     # --- Original Initialization Logic --- #
     logger.info(f"--- Alara StdIO Bridge Initializing ---")
